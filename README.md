@@ -3,9 +3,9 @@ This repo contains the GoLang source files for the serial-tcp gateway intended t
 
 This project solves the problem of ACP02 and ped04-ipgw-02 both requiring access to the same serial port when running on the Reach Technology touchscreens.
 This is achieved by acting as a publisher server, to which subscriber applications can "subscribe" to through a telnet port.
-Once an application is subscribed it will receive anything that arrives on the serial port, and can write anything it pleases to the serial port.
+Once an application is subscribed it will receive anything that arrives on the serial port, and can write anything to the serial port.
 
-The gateway can easily scale to accomodate a large number of TCP connections, should more applications need to access the serial port.
+The gateway is capable of scaling to accomodate a large number of TCP connections, should more applications need to access the serial port.
 
 ## Requirements
 Go 1.18
