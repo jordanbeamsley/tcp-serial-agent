@@ -1,13 +1,10 @@
 package wrappers
 
 import (
+	"bufio"
 	"log"
 	"net"
 )
-
-type Client struct {
-	
-}
 
 func setTcpLog() {
 	log.SetPrefix("TCP - ")
@@ -31,48 +28,76 @@ func InitTcp(network string, address string) net.Listener {
 	return l
 }
 
-func ListenTcp(tcpMsg chan string, listener net.Listener) {
-	setTcpLog()
-
-	msgBuf := make(chan []byte)
-
+func listenClients(listener net.Listener, clients *ClientSlice, newClient chan Client) {
 	for {
+		//TODO: Needs to be moved to a routine. Blocking after first connection
 		conn, err := listener.Accept()
 		if err != nil {
 			log.Println(err)
+			continue
 		}
 
-		go readTcp(msgBuf, conn)
+		client := Client{
+			reader: bufio.NewReader(conn),
+			writer: bufio.NewWriter(conn),
+			conn: conn,
+		}
 
+		log.Printf("New client connected: %s\n", conn.RemoteAddr().String())
+
+		clients.appendClient(client)
+		newClient <- client
+	}
+}
+
+func ListenTcp(tcpMsg chan string, listener net.Listener, clients *ClientSlice) {
+	setTcpLog()
+
+	msgBuf := make(chan []byte)
+	newClient := make(chan Client)
+
+	go listenClients(listener, clients, newClient)
+
+	for {
 		select {
+			case newClientChan := <- newClient:
+				go readTcp(msgBuf, newClientChan)
 			case readChan := <-msgBuf:
 				tcpMsg <- string(readChan)
 		}
 	}
 }
 
-func readTcp(msgBuf chan []byte, conn net.Conn) (msg []byte) {
+func readTcp(msgBuf chan []byte, client Client) {
 	setTcpLog()
 
-	buf := make([]byte, 1024)
 
-	_, err := conn.Read(buf)
-	if err != nil {
-		log.Println("Error reading", err.Error())
+	for {
+		buf, err := client.reader.ReadBytes('\n')
+		if err != nil {
+			log.Println("Error reading", err.Error())
+		}
+
+		msgBuf <- buf
 	}
-
-	msgBuf <- buf
-	conn.Close()
-
-	return
 }
 
-func WriteTcp(msg string, conn net.Conn) {
-	n, err := conn.Write([]byte(msg))
-	if err != nil {
-		log.Println(err)
-		return
+func WriteTcp(msg string, cs *ClientSlice) {
+
+	var n int
+
+	for client := range cs.iterateClients(){
+		var err error
+		n, err = client.writer.WriteString(msg)
+		if err != nil {
+			log.Println(err)
+		}
+		err = client.writer.Flush()
+		if err != nil {
+			log.Println(err)
+		}
 	}
 
+	setTcpLog()
 	log.Printf("Wrote %d bytes.\n", n)
 }
