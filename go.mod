@@ -1,8 +1,8 @@
-module github.com/jordanbeamsley/tcp-serial-agent
+module github.com/jordanbeamsley/sio-bridge
 
 go 1.18
 
-replace github.com/jordanbeamsley/tcp-serial-agent/wrappers => ../wrappers
+replace github.com/jordanbeamsley/sio-bridge/wrappers => ../wrappers
 
 require github.com/tarm/serial v0.0.0-20180830185346-98f6abe2eb07
 

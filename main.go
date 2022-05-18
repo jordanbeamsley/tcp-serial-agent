@@ -5,7 +5,7 @@ import (
 	"log"
 	"net"
 
-	"github.com/jordanbeamsley/tcp-serial-agent/wrappers"
+	"github.com/jordanbeamsley/sio-bridge/wrappers"
 )
 
 const (
