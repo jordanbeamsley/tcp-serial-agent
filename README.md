@@ -1,5 +1,5 @@
-# SIO Gateway
-This repo contains the GoLang source files for the serial-tcp gateway intended to run with ACP02 and ped04-ipgw-02.
+# SIO Bridge
+This repo contains the GoLang source files for the serial-tcp bridge intended to run with ACP02 and ped04-ipgw-02.
 
 This project solves the problem of ACP02 and ped04-ipgw-02 both requiring access to the same serial port when running on the Reach Technology touchscreens.
 This is achieved by acting as a publisher server, to which subscriber applications can "subscribe" to through a telnet port.
@@ -30,3 +30,6 @@ Default values defined as constants in source code.
 | `SER_BAUD`  | `tcp`          | Serial baud rate           |
 
 *Todo: make default values user definable from CLI and/or config file*  
+
+## Roadmap
+- Handle client disconnect
