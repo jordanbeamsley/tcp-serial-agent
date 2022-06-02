@@ -30,6 +30,3 @@ Default values defined as constants in source code.
 | `SER_BAUD`  | `tcp`          | Serial baud rate           |
 
 *Todo: make default values user definable from CLI and/or config file*  
-
-## Roadmap
-- Handle client disconnect
