@@ -12,26 +12,49 @@ type Client struct {
 	conn net.Conn
 }
 
-type ClientSlice struct {
+type ClientMap struct {
 	sync.RWMutex
-	clients []Client
-} 
-
-func (cs *ClientSlice) appendClient(c Client) {
-	cs.Lock()
-	defer cs.Unlock()
-
-	cs.clients = append(cs.clients, c)
+	clients map[string]Client
 }
 
-func (cs *ClientSlice) iterateClients() <- chan Client {
+func NewClientMap() *ClientMap {
+	cm := &ClientMap{
+		clients: make(map[string]Client),
+	}
+
+	return cm
+}
+
+func (cm *ClientMap) Set(key string, c Client) {
+	cm.Lock()
+	defer cm.Unlock()
+
+	cm.clients[key] = c
+}
+
+func (cm *ClientMap) Get(key string) (Client, bool) {
+	cm.Lock()
+	defer cm.Unlock()
+
+	value, ok := cm.clients[key]
+	return value, ok
+}
+
+func (cm *ClientMap) Delete(key string) {
+	cm.Lock()
+	defer cm.Unlock()
+
+	delete(cm.clients, key)
+}
+
+func (cm *ClientMap) iterate() <- chan Client {
 	c := make(chan Client)
 
 	f := func() {
-		cs.Lock()
-		defer cs.Unlock()
-		for _, value := range cs.clients {
-			c <- value
+		cm.Lock()
+		defer cm.Unlock()
+		for _, v := range cm.clients {
+			c <- v
 		}
 		close(c)
 	}
@@ -40,9 +63,9 @@ func (cs *ClientSlice) iterateClients() <- chan Client {
 	return c
 }
 
-func (cs *ClientSlice) ClientLen() int {
-	cs.RLock()
-	defer cs.RUnlock()
+func (cm *ClientMap) ClientLen() int {
+	cm.RLock()
+	defer cm.RUnlock()
 
-	return len(cs.clients)
+	return len(cm.clients)
 }

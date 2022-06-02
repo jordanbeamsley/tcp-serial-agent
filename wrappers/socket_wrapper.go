@@ -6,6 +6,10 @@ import (
 	"net"
 )
 
+var
+	clientMap *ClientMap
+
+
 func setTcpLog() {
 	log.SetPrefix("TCP - ")
 	log.SetFlags(0)
@@ -23,14 +27,16 @@ func InitTcp(network string, address string) net.Listener {
 		log.Fatal(err)
 	}
 
+	clientMap = NewClientMap()
+
 	log.Println("Listening on: " + address)
 
 	return l
 }
 
-func listenClients(listener net.Listener, clients *ClientSlice, newClient chan Client) {
+// listenClients
+func listenForNewClient(listener net.Listener, addrChan chan string) {
 	for {
-		//TODO: Needs to be moved to a routine. Blocking after first connection
 		conn, err := listener.Accept()
 		if err != nil {
 			log.Println(err)
@@ -43,50 +49,60 @@ func listenClients(listener net.Listener, clients *ClientSlice, newClient chan C
 			conn: conn,
 		}
 
-		log.Printf("New client connected: %s\n", conn.RemoteAddr().String())
+		addr := conn.RemoteAddr().String()
 
-		clients.appendClient(client)
-		newClient <- client
+		log.Printf("New client connected: %s\n", addr)
+
+		clientMap.Set(addr, client)
+		addrChan <- addr
 	}
 }
 
-func ListenTcp(tcpMsg chan string, listener net.Listener, clients *ClientSlice) {
+//ListenTcp
+func TcpManager(tcpMsg chan string, listener net.Listener) {
 	setTcpLog()
 
 	msgBuf := make(chan []byte)
-	newClient := make(chan Client)
+	clientAddr := make(chan string)
 
-	go listenClients(listener, clients, newClient)
+	go listenForNewClient(listener, clientAddr)
 
 	for {
 		select {
-			case newClientChan := <- newClient:
-				go readTcp(msgBuf, newClientChan)
+			case clientAddrChan := <- clientAddr:
+				go readTcp(msgBuf, clientAddrChan)
 			case readChan := <-msgBuf:
 				tcpMsg <- string(readChan)
 		}
 	}
 }
 
-func readTcp(msgBuf chan []byte, client Client) {
+func readTcp(msgBuf chan []byte, addr string) {
 	setTcpLog()
 
+	client, exists := clientMap.Get(addr)
+	if !exists {
+		log.Println("Connection to client failed")
+		return
+	}
 
 	for {
 		buf, err := client.reader.ReadBytes('\n')
 		if err != nil {
-			log.Println("Error reading", err.Error())
+			log.Println("Error reading, disconnecting client: ", err.Error())
+			delete(clientMap.clients, client.conn.RemoteAddr().String())
+			return
 		}
 
 		msgBuf <- buf
 	}
 }
 
-func WriteTcp(msg string, cs *ClientSlice) {
+func WriteTcp(msg string) {
 
 	var n int
 
-	for client := range cs.iterateClients(){
+	for client := range clientMap.iterate(){
 		var err error
 		n, err = client.writer.WriteString(msg)
 		if err != nil {
@@ -98,6 +114,8 @@ func WriteTcp(msg string, cs *ClientSlice) {
 		}
 	}
 
-	setTcpLog()
-	log.Printf("Wrote %d bytes.\n", n)
+	if clientMap.ClientLen() > 0  {
+		setTcpLog()
+		log.Printf("Wrote %d bytes.\n", n)
+	}
 }

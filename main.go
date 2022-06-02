@@ -1,9 +1,7 @@
 package main
 
 import (
-	//"fmt"
 	"log"
-	"net"
 
 	"github.com/jordanbeamsley/sio-bridge/wrappers"
 )
@@ -13,7 +11,7 @@ const (
 	CONN_PORT = "3333"
 	CONN_TYPE = "tcp"
 
-	SER_PORT = "/dev/pts/2"
+	SER_PORT = "/dev/ttyUSB0"
 	SER_BAUD = 9600
 )
 
@@ -26,19 +24,15 @@ func main() {
 	tcpMsg := make(chan string)
 	serMsg := make(chan string)
 
-	// Init TCP
-	var l net.Listener
-	address := wrappers.GetAddress(CONN_HOST, CONN_PORT)
-	l = wrappers.InitTcp(CONN_TYPE, address)
-	//defer l.Close()
 
-	var clients wrappers.ClientSlice
+	//Init TCP
+	l := wrappers.InitTcp(CONN_TYPE, wrappers.GetAddress(CONN_HOST, CONN_PORT))
 
 	// Init Serial
 	s := wrappers.InitSer(SER_PORT, SER_BAUD)
 
 	// Run listener goroutines
-	go wrappers.ListenTcp(tcpMsg, l, &clients)
+	go wrappers.TcpManager(tcpMsg, l)
 	go wrappers.ListenSer(serMsg, s)
 
 	for {
@@ -46,7 +40,7 @@ func main() {
 			case tcpMsgChan := <- tcpMsg:
 				go wrappers.WriteSer(tcpMsgChan, s)
 			case serMsgChan := <- serMsg:
-				go wrappers.WriteTcp(serMsgChan, &clients)
+				go wrappers.WriteTcp(serMsgChan)
 		}
 	}
 }
