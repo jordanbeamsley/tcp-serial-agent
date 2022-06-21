@@ -1,0 +1,125 @@
+#include "serial.h"
+
+#include <linux/serial.h>
+#include <string.h>
+#include <sys/ioctl.h>
+#include <unistd.h>
+#include <stdio.h>
+
+#define DEFAULT_SERIAL_RATE 9600
+#define DEFAULT_SERIAL_DEVICE "/dev/pts/4"
+
+fd Serial::init()
+{
+    tty_set_params(0, DEFAULT_SERIAL_RATE, 0);
+    _ser_fd = tty_init(DEFAULT_SERIAL_DEVICE);
+    if (_ser_fd < 0)
+    {
+        return -1;
+    }
+
+    return _ser_fd;
+}
+
+void Serial::tty_set_params(int local_echo, unsigned int serial_rate, int enable_rs485)
+{
+    static const struct {
+        unsigned int as_uint; 
+        speed_t as_speed;
+    } speedTable[] = {
+        {   1200,   B1200 },
+        {   9600,   B9600 },
+        {  19200,  B19200 },
+        {  38400,  B38400 },
+        {  57600,  B57600 },
+        { 115200, B115200 },
+        { 230400, B230400 }
+    };
+
+    //Assign unix compliant baud rate from speed table
+    unsigned i;
+    for (i = 0 ; i < (sizeof(speedTable) / sizeof(speedTable[0])) ; i++) {
+        if (speedTable[i].as_uint == serial_rate) {
+            _tty_rate = speedTable[i].as_speed;
+            break;
+        }
+    }
+
+    _local_echo_flag = local_echo;
+    _rs485_mode = enable_rs485;
+}
+
+int Serial::tty_init(const char *tty_dev)
+{
+    fd ser_fd = -1;
+
+    //Rs485 struct holds config info for rs485 settings
+    struct serial_rs485 rs485_conf;
+
+    //Termios struct holds config info for port
+    struct termios tio;
+
+    memset(&tio, 0, sizeof(tio));       // Set all bits in termios config to 0
+    tio.c_iflag = 0;                    //input processing; parity, flow control, etc.
+    tio.c_oflag = 0;                    //output parameters; translation, padding, etc.
+    tio.c_cflag = CS8 | CREAD | CLOCAL; //control parameters: 8b/B, can be read from, attached locally
+    tio.c_lflag = 0;                    //local modes; echoing, signals, etc.
+    tio.c_cc[VMIN] = 1;                 //min number of bytes required for *read* to return
+    tio.c_cc[VTIME] = 5;                //how long to wait for input before returning (0.1s units)
+
+    //Open file (port) with read/write access and assign file descriptor (fd)
+    ser_fd = open(tty_dev, O_RDWR);
+    if (ser_fd < 0) 
+    {
+        return -1;    
+    } 
+
+    if (_rs485_mode) {
+        rs485_conf.flags |= SER_RS485_ENABLED;   //Enable RS-485 mode:
+        rs485_conf.delay_rts_before_send = 0;    //Set rts/txen delay before send
+        rs485_conf.delay_rts_after_send = 0;     //Set rts/txen delay after send
+
+        //Write the RS-485 config to the open file descriptor with ioctl.
+        if (ioctl (ser_fd, TIOCSRS485, &rs485_conf) < 0) {
+            perror("ioctl");
+            return -1;
+        }
+    }
+
+    cfsetospeed(&tio, _tty_rate); //set output baud rate
+    cfsetispeed(&tio, _tty_rate); //set input baud rate
+
+    /* save the termios config to the open file descriptor,
+        * TCSAFLUSH flushes IO buffers and applies config */
+    tcsetattr(ser_fd, TCSAFLUSH, &tio);
+
+    //return open file descriptor
+    return ser_fd;
+}
+
+int Serial::read(char *buf)
+{
+    size_t read_size = ::read(_ser_fd, buf, MAX_SER_BUF);
+    if (read_size <= 0)
+    {
+        return -1;
+    }
+
+    return read_size; 
+}
+
+int Serial::write(const char *buf)
+{
+    size_t write_size = ::write(_ser_fd, buf, sizeof(buf));
+    if (write_size <= 0)
+    {
+        return -1;
+    }
+
+    return write_size;
+}
+
+void Serial::close()
+{
+    ::close(_ser_fd);
+}
