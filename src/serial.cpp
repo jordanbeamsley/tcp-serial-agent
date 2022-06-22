@@ -6,21 +6,6 @@
 #include <unistd.h>
 #include <stdio.h>
 
-#define DEFAULT_SERIAL_RATE 9600
-#define DEFAULT_SERIAL_DEVICE "/dev/pts/4"
-
-fd Serial::init()
-{
-    tty_set_params(0, DEFAULT_SERIAL_RATE, 0);
-    _ser_fd = tty_init(DEFAULT_SERIAL_DEVICE);
-    if (_ser_fd < 0)
-    {
-        return -1;
-    }
-
-    return _ser_fd;
-}
-
 void Serial::tty_set_params(int local_echo, unsigned int serial_rate, int enable_rs485)
 {
     static const struct {
@@ -49,9 +34,9 @@ void Serial::tty_set_params(int local_echo, unsigned int serial_rate, int enable
     _rs485_mode = enable_rs485;
 }
 
-int Serial::tty_init(const char *tty_dev)
+Ser::Err Serial::tty_init(fd *ser_fd, const char *tty_dev)
 {
-    fd ser_fd = -1;
+    *ser_fd = -1;
 
     //Rs485 struct holds config info for rs485 settings
     struct serial_rs485 rs485_conf;
@@ -68,11 +53,12 @@ int Serial::tty_init(const char *tty_dev)
     tio.c_cc[VTIME] = 5;                //how long to wait for input before returning (0.1s units)
 
     //Open file (port) with read/write access and assign file descriptor (fd)
-    ser_fd = open(tty_dev, O_RDWR);
-    if (ser_fd < 0) 
+    *ser_fd = open(tty_dev, O_RDWR);
+    if (*ser_fd < 0) 
     {
-        return -1;    
-    } 
+        return Ser::ERR_OPEN_PORT;    
+    }
+    _ser_fd = *ser_fd; 
 
     if (_rs485_mode) {
         rs485_conf.flags |= SER_RS485_ENABLED;   //Enable RS-485 mode:
@@ -80,9 +66,8 @@ int Serial::tty_init(const char *tty_dev)
         rs485_conf.delay_rts_after_send = 0;     //Set rts/txen delay after send
 
         //Write the RS-485 config to the open file descriptor with ioctl.
-        if (ioctl (ser_fd, TIOCSRS485, &rs485_conf) < 0) {
-            perror("ioctl");
-            return -1;
+        if (ioctl (*ser_fd, TIOCSRS485, &rs485_conf) < 0) {
+            return Ser::ERR_SET_CONFIG;
         }
     }
 
@@ -91,35 +76,45 @@ int Serial::tty_init(const char *tty_dev)
 
     /* save the termios config to the open file descriptor,
         * TCSAFLUSH flushes IO buffers and applies config */
-    tcsetattr(ser_fd, TCSAFLUSH, &tio);
+    if (tcsetattr(*ser_fd, TCSAFLUSH, &tio) < 0) {
+        return Ser::ERR_SET_ATTR;
+    }
 
-    //return open file descriptor
-    return ser_fd;
+    return Ser::NO_ERR;
 }
 
-int Serial::read(char *buf)
+Ser::Err Serial::read(char *buf, size_t size)
 {
-    size_t read_size = ::read(_ser_fd, buf, MAX_SER_BUF);
+    size_t read_size = ::read(_ser_fd, buf, size);
     if (read_size <= 0)
     {
-        return -1;
+        return Ser::ERR_READ;
     }
 
-    return read_size; 
+    return Ser::NO_ERR; 
 }
 
-int Serial::write(const char *buf)
+Ser::Err Serial::write(const char *buf, size_t size)
 {
-    size_t write_size = ::write(_ser_fd, buf, sizeof(buf));
-    if (write_size <= 0)
+    if (::write(_ser_fd, buf, size) < 0)
     {
-        return -1;
+        return Ser::ERR_WRITE;
     }
 
-    return write_size;
+    if (::write(_ser_fd, "\r\n", 2) < 0)
+    {
+        return Ser::ERR_WRITE;
+    }
+
+    return Ser::NO_ERR;
 }
 
-void Serial::close()
+Ser::Err Serial::close()
 {
-    ::close(_ser_fd);
+    if (::close(_ser_fd) < 0)
+    {
+        return Ser::ERR_CLOSE;
+    }
+
+    return Ser::NO_ERR;
 }

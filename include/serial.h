@@ -5,23 +5,23 @@
 #include <termios.h>
 
 #include <defs.h>
+#include "error.h"
 
 class Serial
 {
 private:
-    void tty_set_params(int local_echo, unsigned int serial_rate, int enable_rs485);
-    fd tty_init(const char *tty_dev);
-
     speed_t _tty_rate;
     int _local_echo_flag;
     int _rs485_mode;
     fd _ser_fd;
 
 public:
-    fd init();
-    int write(const char *buf);
-    int read(char *buf);
-    void close();
+    void tty_set_params(int, unsigned int, int);
+    Ser::Err tty_init(fd *, const char *);
+
+    Ser::Err write(const char *buf, size_t size);
+    Ser::Err read(char *buf, size_t size);
+    Ser::Err close();
 };
 
 

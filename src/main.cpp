@@ -5,89 +5,162 @@
 
 #include "tcp_server.h"
 #include "serial.h"
+#include "error.h"
 
 #define MAX_EVENTS 10
+
+Epol::Err epol_assign(fd epoll_fd, fd new_fd, epoll_event *ev)
+{
+    ev->data.fd = new_fd;
+    if (epoll_ctl(epoll_fd, EPOLL_CTL_ADD, new_fd, ev) < 0)
+    {
+        return Epol::ERR_ASSIGN;
+    }
+
+    return Epol::NO_ERR;
+}
 
 int main(int argc, char const *argv[])
 {
     //Initialize epoll structures
     int ev_count;
-    fd nfds, epoll_fd;
+    fd epoll_fd;
     struct epoll_event ev, events[MAX_EVENTS];
+    Epol::Err epol_err;
 
     epoll_fd = epoll_create1(0);
     if (epoll_fd == -1)
     {
-        perror("epoll_create1");
+        fprintf(stderr, "%s\n", Epol::map_error(Epol::ERR_CREATE));
+        exit(EXIT_FAILURE);
+    }
+    ev.events = EPOLLIN;
+
+    //Initialize tcp server
+    fd sock_fd;
+    Tcp::Err tcp_err;
+    Tcp_Server *server = new Tcp_Server();
+    
+    tcp_err = server->init(&sock_fd);
+    if (tcp_err != Tcp::NO_ERR)
+    {
+        fprintf(stderr, "%s\n", Tcp::map_error(tcp_err));
         exit(EXIT_FAILURE);
     }
 
-    //Initialize tcp server
-    Tcp_Server *server = new Tcp_Server();
-    fd sock_fd = server->init();
-
-    ev.events = EPOLLIN;
-    ev.data.fd = sock_fd;
-    if (epoll_ctl(epoll_fd, EPOLL_CTL_ADD, sock_fd, &ev) < 0)
+    epol_err = epol_assign(epoll_fd, sock_fd, &ev);
+    if (epol_err != Epol::NO_ERR)
     {
-        fprintf(stderr, "error assigning socked fd\n");
-        return 1;
+        fprintf(stderr, "%s - '%d'\n", Epol::map_error(epol_err), sock_fd);
+        exit(EXIT_FAILURE);
     }
 
     //Initialize serial port
+    fd ser_fd;
+    Ser::Err ser_err;
     Serial *serial = new Serial();
-    fd ser_fd = serial->init();
-
-    printf("%d\n", ser_fd);
-
-    ev.data.fd = ser_fd;
-    if (epoll_ctl(epoll_fd, EPOLL_CTL_ADD, ser_fd, &ev) < 0)
+    
+    serial->tty_set_params(DEFAULT_SERIAL_ECHO, DEFAULT_SERIAL_RATE, DEFAULT_SERIAL_RS485);
+    ser_err = serial->tty_init(&ser_fd, DEFAULT_SERIAL_DEVICE);
+    if (ser_err != Ser::NO_ERR)
     {
-        fprintf(stderr, "error assigning serial fd\n");
-        return 1;
+        fprintf(stderr, "%s\n", Ser::map_error(ser_err));
+        exit(EXIT_FAILURE);
     }
 
-    char read_buffer[MAX_SER_BUF] = "";
-    size_t bytes_read;
-    fd ev_fd;
+    epol_err = epol_assign(epoll_fd, ser_fd, &ev);
+    if (epol_err != Epol::NO_ERR)
+    {
+        fprintf(stderr, "%s - '%d'\n", Epol::map_error(epol_err), sock_fd);
+        exit(EXIT_FAILURE);
+    }
 
     //Main loop
+    char buf[MAX_BUF] = "";
+    fd ev_fd;
+    int ser_conn_flag = 0;
+
     while(1)
-    {   
+    {  
         ev_count = epoll_wait(epoll_fd, events, MAX_EVENTS, -1);
-        printf("%d ready events\n", ev_count);
         for (int i = 0; i < ev_count; i++)
         {   
             ev_fd = events[i].data.fd;
 
-            //New connection to server
+            //Event from server
             if (ev_fd == sock_fd)
             {
-                fd client_fd = server->accept_clients();
-                printf("client accepted - '%d'\n", client_fd);
-
-                ev.data.fd = client_fd;
-                if (epoll_ctl(epoll_fd, EPOLL_CTL_ADD, client_fd, &ev) < 0)
+                //Accept client
+                Client *client;
+                tcp_err = server->accept_client(&client);
+                
+                if (tcp_err != Tcp::NO_ERR)
                 {
-                    fprintf(stderr, "error epoll set insertion: '%d\n'", client_fd);
+                    fprintf(stderr, "%s\n", Tcp::map_error(tcp_err));
+                    continue;
+                }
+                
+                fprintf(stdout, "client accepted - '%s:%d'\n", client->ip.c_str(), client->port);
+
+                //Add client to epoll
+                fd client_fd = client->client_fd;
+                epol_err = epol_assign(epoll_fd, client_fd, &ev);
+                if (epol_err != Epol::NO_ERR)
+                {
+                    fprintf(stderr, "%s - '%d'\n", Epol::map_error(epol_err), client_fd);
+                    server->remove_client(client_fd);
+                    continue;
                 }
             }
 
+            //Event from serial
             else if (ev_fd == ser_fd)
             {
-                serial->read(read_buffer);
-                printf("recv from '%d' - %s\n", ev_fd, read_buffer);
-                server->send_all_clients(read_buffer, sizeof(read_buffer));
-                memset(read_buffer, 0, MAX_SER_BUF);
+                //Check if disconnected
+                if(serial->read(buf, MAX_BUF) < 0)
+                {
+                    ser_conn_flag = -1;
+                    serial->close();
+                    break;
+                }
+
+                fprintf(stdout, "received %ld bytes from serial\n", strlen(buf));
+                
+                //Send serial message to clients
+                tcp_err = server->send_all_clients(buf, sizeof(buf));
+                if (tcp_err != Tcp::NO_ERR)
+                {
+                    fprintf(stderr, "%s\n", Tcp::map_error(tcp_err));
+                }
+                memset(buf, 0, strlen(buf));
             }
 
-            //Message from client
+            //Event from client
             else
             {
-                read(ev_fd, read_buffer, 10);
-                printf("recv from '%d' - %s\n", ev_fd, read_buffer);
-                memset(read_buffer, 0, MAX_SER_BUF);
+                tcp_err = server->recv(ev_fd, buf, MAX_BUF);
+
+                //Disconnect client if read error occurred
+                if(tcp_err != Tcp::NO_ERR)
+                {
+                    fprintf(stderr, "%s\n", Tcp::map_error(tcp_err));
+                    fprintf(stdout, "disconneting client...\n");
+                    server->remove_client(ev_fd);
+                    continue;
+                }
+
+                fprintf(stdout, "received %ld bytes from client\n", strlen(buf));
+
+                //Send client message to serial
+                serial->write(buf, strlen(buf));
+                memset(buf, 0, strlen(buf));
             }
+        }
+
+        //If serial port is disconnected, exit program
+        if (ser_conn_flag < 0)
+        {
+            break;
         }
     }
     
