@@ -9,7 +9,7 @@ typedef int fd;
 
 //Serial
 #define DEFAULT_SERIAL_RATE 9600
-#define DEFAULT_SERIAL_DEVICE "/dev/pts/4"
+#define DEFAULT_SERIAL_DEVICE "/dev/ttyUSB0"
 #define DEFAULT_SERIAL_ECHO 0
 #define DEFAULT_SERIAL_RS485 0
 

@@ -117,8 +117,10 @@ int main(int argc, char const *argv[])
             else if (ev_fd == ser_fd)
             {
                 //Check if disconnected
-                if(serial->read(buf, MAX_BUF) < 0)
+                ser_err = serial->read(buf, MAX_BUF);
+                if(ser_err != Ser::NO_ERR)
                 {
+                    fprintf(stderr, "%s\n", Ser::map_error(ser_err));
                     ser_conn_flag = -1;
                     serial->close();
                     break;
