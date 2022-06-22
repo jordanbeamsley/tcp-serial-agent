@@ -1,9 +1,5 @@
 #include "tcp_server.h"
 
-#define SERVER_ADDR "127.0.0.1"
-#define SERVER_PORT 3333
-#define MAX_CONN 10 
-
 Tcp::Err Tcp_Server::init(fd *sock_fd)
 {
     memset(&_server_addr, 0, sizeof(_server_addr));
@@ -15,14 +11,14 @@ Tcp::Err Tcp_Server::init(fd *sock_fd)
     if (setsockopt(_sock_fd, SOL_SOCKET, SO_REUSEADDR, &enable, sizeof(int)) < 0)
         return Tcp::ERR_SET_SOCK_OPT;
 
-    _server_addr.sin_addr.s_addr = inet_addr(SERVER_ADDR);
+    _server_addr.sin_addr.s_addr = inet_addr(DEFAULT_SERVER_ADDR);
     _server_addr.sin_family = AF_INET;
-    _server_addr.sin_port = htons(SERVER_PORT);
+    _server_addr.sin_port = htons(DEFAULT_SERVER_PORT);
 
     if (bind(_sock_fd, (struct sockaddr*) &_server_addr, sizeof(_server_addr)) < 0)
         return Tcp::ERR_BIND_SOCK;
     
-    if (listen(_sock_fd, MAX_CONN) == -1)
+    if (listen(_sock_fd, DEFAULT_SERVER_MAX_CONN) == -1)
         return Tcp::ERR_SOCK_LISTEN;
 
     *sock_fd = _sock_fd;
