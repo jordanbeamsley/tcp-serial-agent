@@ -154,7 +154,7 @@ int main(int argc, char const *argv[])
                 fprintf(stdout, "received %ld bytes from client - fd: %d\n", strlen(buf), ev_fd);
 
                 //Send client message to serial
-                serial->write(buf, strlen(buf));
+                serial->write(buf, strlen(buf) -1);
                 memset(buf, 0, strlen(buf));
             }
         }
