@@ -85,36 +85,35 @@ Ser::Err Serial::tty_init(fd *ser_fd, const char *tty_dev)
 
 Ser::Err Serial::read(char *buf, size_t size)
 {
+    //Return if read error
     size_t read_size = ::read(_ser_fd, buf, size);
     if (read_size <= 0)
-    {
         return Ser::ERR_READ;
-    }
 
+    //Return no error
     return Ser::NO_ERR; 
 }
 
 Ser::Err Serial::write(const char *buf, size_t size)
 {
+    //Return if error writing message
     if (::write(_ser_fd, buf, size) < 0)
-    {
         return Ser::ERR_WRITE;
-    }
 
+    //Return if error writing terminator
     if (::write(_ser_fd, "\r\n", 2) < 0)
-    {
         return Ser::ERR_WRITE;
-    }
 
+    //Return no error
     return Ser::NO_ERR;
 }
 
 Ser::Err Serial::close()
 {
+    //Return if error closing serial
     if (::close(_ser_fd) < 0)
-    {
         return Ser::ERR_CLOSE;
-    }
 
+    //Return no error
     return Ser::NO_ERR;
 }

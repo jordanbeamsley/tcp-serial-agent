@@ -30,9 +30,9 @@ struct Client
         return ::recv(client_fd, buf, size, 0);
     }
 
-    void close() const
+    int close() const
     {
-        ::close(client_fd);
+        return ::close(client_fd);
     }
 };
 
@@ -50,7 +50,8 @@ public:
     Tcp::Err send_all_clients(const char*, size_t);
     Tcp::Err accept_client(Client**);
     Tcp::Err recv(fd, char*, size_t);
-    void remove_client(fd);
+    Tcp::Err remove_client(fd);
+    Tcp::Err remove_all_clients();
 };
 
 #endif // TCP_SERVER_H

@@ -27,6 +27,7 @@ namespace Tcp
         ERR_CLIENT_NOT_FOUND,
         ERR_RECV,
         ERR_SEND,
+        ERR_CLOSE
     };
 
     const char* map_error(Err err_code);

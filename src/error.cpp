@@ -25,6 +25,7 @@ const char* Tcp::map_error(Err err_code)
         case ERR_CLIENT_NOT_FOUND:  return "error TCP client not found in map";
         case ERR_RECV:              return "error receiving from TCP client";
         case ERR_SEND:              return "error sending to one or more TCP clients";
+        case ERR_CLOSE:             return "error closing TCP socket";
     }
 
     return "Unknown error";

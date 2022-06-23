@@ -22,7 +22,7 @@ Epol::Err epol_assign(fd epoll_fd, fd new_fd, epoll_event *ev)
 
 int main(int argc, char const *argv[])
 {
-    //Initialize epoll structures
+    /* ================== Initialize epoll structures ================== */
     int ev_count;
     fd epoll_fd;
     struct epoll_event ev, events[MAX_EVENTS];
@@ -36,7 +36,7 @@ int main(int argc, char const *argv[])
     }
     ev.events = EPOLLIN;
 
-    //Initialize tcp server
+    /* ================== Initialize tcp server ================== */
     fd sock_fd;
     Tcp::Err tcp_err;
     Tcp_Server *server = new Tcp_Server();
@@ -55,7 +55,7 @@ int main(int argc, char const *argv[])
         exit(EXIT_FAILURE);
     }
 
-    //Initialize serial port
+    /* ================== Initialize serial port ================== */
     fd ser_fd;
     Ser::Err ser_err;
     Serial *serial = new Serial();
@@ -75,7 +75,7 @@ int main(int argc, char const *argv[])
         exit(EXIT_FAILURE);
     }
 
-    //Main loop
+    /* ================== Main loop ================== */
     char buf[MAX_BUF] = "";
     fd ev_fd;
     int ser_conn_flag = 0;
@@ -87,7 +87,7 @@ int main(int argc, char const *argv[])
         {   
             ev_fd = events[i].data.fd;
 
-            //Event from server
+            /* ================== Event from server ================== */
             if (ev_fd == sock_fd)
             {
                 //Accept client
@@ -113,7 +113,7 @@ int main(int argc, char const *argv[])
                 }
             }
 
-            //Event from serial
+            /* ================== Event from serial ================== */
             else if (ev_fd == ser_fd)
             {
                 //Check if disconnected
@@ -137,7 +137,7 @@ int main(int argc, char const *argv[])
                 memset(buf, 0, strlen(buf));
             }
 
-            //Event from client
+            /* ================== Event from client ================== */
             else
             {
                 tcp_err = server->recv(ev_fd, buf, MAX_BUF);
@@ -166,11 +166,18 @@ int main(int argc, char const *argv[])
         }
     }
     
+    /* ================== Close and deaollocate ================== */
+    
+    //Free serial
+    serial->close();
+    delete(serial);
 
-    if (close(epoll_fd))
-    {
-        perror("close epoll");
-    }
+    //Free server
+    server->remove_all_clients();
+    delete(serial);
+
+    //Free epoll
+    close(epoll_fd);
 
     return 0;
 }
