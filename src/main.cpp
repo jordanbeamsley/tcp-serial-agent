@@ -151,7 +151,7 @@ int main(int argc, char const *argv[])
                     continue;
                 }
 
-                fprintf(stdout, "received %ld bytes from client\n", strlen(buf));
+                fprintf(stdout, "received %ld bytes from client - fd: %d\n", strlen(buf), ev_fd);
 
                 //Send client message to serial
                 serial->write(buf, strlen(buf));
@@ -167,7 +167,7 @@ int main(int argc, char const *argv[])
     }
     
     /* ================== Close and deaollocate ================== */
-    
+
     //Free serial
     serial->close();
     delete(serial);
