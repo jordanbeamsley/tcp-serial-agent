@@ -48,7 +48,7 @@ Ser::Err Serial::tty_init(fd *ser_fd, const char *tty_dev)
     tio.c_iflag = 0;                    //input processing; parity, flow control, etc.
     tio.c_oflag = 0;                    //output parameters; translation, padding, etc.
     tio.c_cflag = CS8 | CREAD | CLOCAL; //control parameters: 8b/B, can be read from, attached locally
-    tio.c_lflag = 0;                    //local modes; echoing, signals, etc.
+    tio.c_lflag = ICANON;                    //local modes; echoing, signals, etc.
     tio.c_cc[VMIN] = 1;                 //min number of bytes required for *read* to return
     tio.c_cc[VTIME] = 5;                //how long to wait for input before returning (0.1s units)
 
