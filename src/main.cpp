@@ -48,6 +48,8 @@ int main(int argc, char const *argv[])
         exit(EXIT_FAILURE);
     }
 
+    fprintf(stdout, "tcp server created: %s:%d\n", DEFAULT_SERVER_ADDR, DEFAULT_SERVER_PORT);
+
     epol_err = epol_assign(epoll_fd, sock_fd, &ev);
     if (epol_err != Epol::NO_ERR)
     {
@@ -67,6 +69,8 @@ int main(int argc, char const *argv[])
         fprintf(stderr, "%s\n", Ser::map_error(ser_err));
         exit(EXIT_FAILURE);
     }
+
+    fprintf(stdout, "serial port opened: %s\n", DEFAULT_SERIAL_DEVICE);
 
     epol_err = epol_assign(epoll_fd, ser_fd, &ev);
     if (epol_err != Epol::NO_ERR)
@@ -129,7 +133,7 @@ int main(int argc, char const *argv[])
                 fprintf(stdout, "received %ld bytes from serial\n", strlen(buf));
                 
                 //Send serial message to clients
-                tcp_err = server->send_all_clients(buf, sizeof(buf));
+                tcp_err = server->send_all_clients(buf, strlen(buf));
                 if (tcp_err != Tcp::NO_ERR)
                 {
                     fprintf(stderr, "%s\n", Tcp::map_error(tcp_err));
