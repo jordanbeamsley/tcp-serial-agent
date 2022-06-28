@@ -1,8 +1,6 @@
 #if !defined(ERROR_H)
 #define ERROR_H
 
-#include <string>
-
 namespace Epol
 {
     enum Err {

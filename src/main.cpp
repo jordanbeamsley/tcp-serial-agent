@@ -6,6 +6,7 @@
 #include "tcp_server.h"
 #include "serial.h"
 #include "error.h"
+#include "program_options.h"
 
 #define MAX_EVENTS 10
 
@@ -20,8 +21,12 @@ Epol::Err epol_assign(fd epoll_fd, fd new_fd, epoll_event *ev)
     return Epol::NO_ERR;
 }
 
-int main(int argc, char const *argv[])
+int main(int argc, char *argv[])
 {
+    Program_Options *prog_opts = new Program_Options();
+    prog_opts->load_defaults();
+    prog_opts->parse(argc, argv);
+
     /* ================== Initialize epoll structures ================== */
     int ev_count;
     fd epoll_fd;
@@ -62,15 +67,15 @@ int main(int argc, char const *argv[])
     Ser::Err ser_err;
     Serial *serial = new Serial();
     
-    serial->tty_set_params(DEFAULT_SERIAL_ECHO, DEFAULT_SERIAL_RATE, DEFAULT_SERIAL_RS485);
-    ser_err = serial->tty_init(&ser_fd, DEFAULT_SERIAL_DEVICE);
+    serial->tty_set_params(DEFAULT_SERIAL_ECHO, DEFAULT_SERIAL_RATE, prog_opts->rs485);
+    ser_err = serial->tty_init(&ser_fd, prog_opts->serial_device.c_str());
     if (ser_err != Ser::NO_ERR)
     {
         fprintf(stderr, "%s\n", Ser::map_error(ser_err));
         exit(EXIT_FAILURE);
     }
 
-    fprintf(stdout, "serial port opened: %s\n", DEFAULT_SERIAL_DEVICE);
+    fprintf(stdout, "serial port opened: %s\n", prog_opts->serial_device.c_str());
 
     epol_err = epol_assign(epoll_fd, ser_fd, &ev);
     if (epol_err != Epol::NO_ERR)
