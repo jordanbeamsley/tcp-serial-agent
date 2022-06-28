@@ -71,7 +71,7 @@ int main(int argc, char *argv[])
     ser_err = serial->tty_init(&ser_fd, prog_opts->serial_device.c_str());
     if (ser_err != Ser::NO_ERR)
     {
-        fprintf(stderr, "%s\n", Ser::map_error(ser_err));
+        fprintf(stderr, "%s: %s\n", Ser::map_error(ser_err), prog_opts->serial_device.c_str());
         exit(EXIT_FAILURE);
     }
 

@@ -4,7 +4,7 @@
 #include <getopt.h>
 #include "defs.h"
 
-#define SHORT_OPTS "d:hv"
+#define SHORT_OPTS "d:hvr"
 
 void Program_Options::load_defaults()
 {
